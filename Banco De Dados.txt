@@ -1,0 +1,177 @@
+drop database if exists Empresa;
+create database Empresa;
+use Empresa;
+
+create table Veiculo(
+id int primary key
+auto_increment,
+modelo varchar(15) not null,
+marca varchar(15) not null,
+placa varchar(10) not null
+);
+
+create table Condutor(
+id int primary key
+auto_increment,
+nome varchar(20) not null,
+idade int not null,
+sexo varchar(10) not null,
+cnh varchar(11)
+);
+
+create table Cidade(
+id int primary key
+auto_increment,
+nome varchar(15) not null,
+tamanho decimal(10,3) not null,
+populacao decimal(10,3) not null
+);
+
+create table Viagem(
+id int primary key
+auto_increment,
+datasaida date,
+distancia decimal(10,2),
+CidadeOrigem int,
+CidadeDestino int,
+foreign key (CidadeOrigem)  references Cidade(id),
+foreign key (CidadeDestino) references Cidade(id),
+Veiculo_id int,
+Condutor_id int,
+foreign key (Veiculo_id)   references Veiculo(id),
+foreign key (Condutor_id)  references Condutor(id)
+);
+
+create table Atualizacao(
+id int,
+quando datetime,
+quem varchar(40)
+);
+
+insert into Cidade (nome, tamanho, populacao) values ("Votorantim", 177, 123599);
+insert into Cidade (nome, tamanho, populacao) values ("Sorocaba", 450, 687357);
+insert into Cidade (nome, tamanho, populacao) values ("Pongai", 183, 3400);
+insert into Cidade (nome, tamanho, populacao) values ("Tatui", 523, 122967);
+insert into Cidade (nome, tamanho, populacao) values ("Boituva", 248, 62170);
+
+insert into Condutor (nome, idade, sexo, cnh) values ("Gabriel", 18, "Masculino", 
+"01235162563");
+insert into Condutor (nome, idade, sexo, cnh) values ("Matheus", 21, "Masculino", 
+"05464723771");
+insert into Condutor (nome, idade, sexo) values ("Juan", 28, "Masculino");
+insert into Condutor (nome, idade, sexo, cnh) values ("Julia", 19, "Feminino", 
+"08763763895");
+insert into Condutor (nome, idade, sexo, cnh) values ("Jessica", 29, "Feminino", 
+"07638523896");
+
+insert into Veiculo (modelo, marca, placa) values ("Up", "Volkswagem", "RIO2A18");
+insert into Veiculo (modelo, marca, placa) values ("Corsa", "Chevrolet", 
+"ARE1E20");
+insert into Veiculo (modelo, marca, placa) values ("Tracker", "Chevrolet", 
+"TRA5A73");
+insert into Veiculo (modelo, marca, placa) values ("320i", "Bmw", "BMW3B54");
+insert into Veiculo (modelo, marca, placa) values ("Amarok", "Volkswagem", 
+"ARK5E12");
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-11-25", 20, 1, 2, 4, 2);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-10-03", 312, 1, 3, 3, 1);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-03-12", 619, 1, 4, 1, 3);
+insert into Viagem (datasaida, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-05-21", 1, 5, 5, 5);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-09-17", 526, 2, 3, 2, 4);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-06-10", 872, 2, 4, 5, 2);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-01-08", 124, 2, 5, 4, 2);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-01-29", 326, 3, 4, 5, 1);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2022-03-25", 32, 3, 5, 2, 5);
+insert into Viagem (datasaida, distancia, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values ("2021-12-13", 189, 4, 5, 3, 2);
+
+delimiter $
+create function contadorPlaca(placa varchar(10)) returns int deterministic
+begin
+set @placa = trim(placa);
+set @count = (select count(Viagem.id) from Viagem join Veiculo on Veiculo_id 
+= Veiculo.id where Veiculo.placa = @placa);
+return @count;
+end$
+create procedure novaViagem(
+cidadeOrigem  int,
+    cidadeDestino int,
+    condutor_id   int,
+    veiculo_id   int
+)
+begin
+set @dataAmanha = (date_add(curdate(),interval 1 day));
+
+insert into Viagem (datasaida, CidadeOrigem, CidadeDestino, Veiculo_id, 
+Condutor_id) values (@dataAmanha, cidadeOrigem, cidadeDestino, veiculo_id, 
+condutor_id);
+end$
+delimiter ;
+
+delimiter $
+create trigger Atualizacao after update on Viagem
+for each row
+    begin
+insert into Atualizacao values (old.id, sysdate(), user());
+end$
+delimiter ;
+
+delimiter $
+create function mostrarDistancia(numero1 int, numero2 int) returns decimal(10,2) 
+deterministic
+begin
+set @cidadeDefinida1 = (select id from Cidade where id = numero1 LIMIT 1);
+    set @cidadeDefinida2 = (select id from Cidade where id = numero2 LIMIT 1);
+    if (@cidadeDefinida1 is null or @cidadeDefinida2 is null) then
+signal SQLSTATE '45001'
+        set message_text = "Cidade nao definidas",
+        MYSQL_ERRNO = 2023;
+end if;
+    set @resposta = (select distancia from Viagem where CidadeOrigem = numero1 and 
+CidadeDestino = numero2 LIMIT 1);
+    if (@resposta is null) then
+signal SQLSTATE '45000'
+        set message_text = "Distancia nao encontrada",
+        MYSQL_ERRNO = 2022;
+end if;
+    return @resposta;    
+end$
+delimiter ;
+
+# Questao 3:
+# select contadorPlaca ("ARK5E12");
+
+# Questao 4:
+# call novaViagem (1,2,3,4);
+
+# Questao 5:
+# update Viagem set distancia = 156 where id = 3;
+# update Viagem set distancia = 132 where id = 1;
+# select id as "Viagem Alterada", quando as "Quando", quem as "Quem" from 
+Atualizacao
+
+# Questao 7:
+# select C1.nome as "Cidade Origem" , C2.nome as "Cidade Destino" , Condutor.nome 
+as "Condutor" , Veiculo.placa as "Placa do Veiculo", Veiculo.modelo as "Modelo Do 
+Carro", Viagem.datasaida as "Data Saida" from Viagem join Condutor on Condutor_id =
+Condutor.id join Veiculo on Veiculo_id = Veiculo.id join Cidade C1 on CidadeOrigem 
+= C1.id join Cidade C2 on CidadeDestino = C2.id 
+
+# Questao 8:
+# select C1.nome as "Cidade Destino" , C2.nome as "Cidade Origem", distancia as 
+"Distancia" from Viagem join Cidade C1 on CidadeOrigem = C1.id join Cidade C2 on 
+CidadeDestino = C2.id where distancia > 0
+
+# Questao 9:
+# select mostrarDistancia(6,1);
+
+# Questao 10:
+# select nome, cnh from Condutor where cnh is null
